@@ -18,26 +18,47 @@ var handlers = {
     "SlotCheckIntent": function () {
         console.log("FULL REQUEST = " + JSON.stringify(this.event));
         
-        var failFlag = true;
-        if (this.event.request.intent.slots.slottype === undefined) failFlag = false;
-        if (this.event.request.intent.slots.slottype.value === undefined) failFlag = false;
-        if (this.event.request.intent.slots.slottype.resolutions === undefined) failFlag = false;
+        var failFlag = false;
+        if (this.event.request.intent.slots.slottype === undefined) failFlag = true;
+        if (this.event.request.intent.slots.slottype.value === undefined) failFlag = true;
+        if (this.event.request.intent.slots.slottype.resolutions === undefined) failFlag = true;
         
-        if (failFlag)
+        if (!failFlag)
         {
-            console.log("FAILFLAG == TRUE");
+            console.log("FAILFLAG == FALSE");
             var slotValue = this.event.request.intent.slots.slottype.value;
         
             if (this.event.request.intent.slots.slottype.resolutions.resolutionsPerAuthority[0].status.code === "ER_SUCCESS_MATCH")
             {
                 httpsGet(LOCATION_SLOTS, (result) => {
                     console.log("RESULT = " + JSON.stringify(result));
+                    var listLength = this.event.request.intent.slots.slottype.resolutions.resolutionsPerAuthority[0].values.length;
                     
-                    var slotInfo = getSlotInfo(this, result, slotValue);
-                    var response = "";
-                    response = slotInfo;
-                    this.emit(":askWithCard", response, response);
-                    //this.emit(':askWithCard', speechOutput, repromptSpeech, cardTitle, cardContent, imageObj);
+                    if (listLength === 1)
+                    {
+                        var slotName = this.event.request.intent.slots.slottype.resolutions.resolutionsPerAuthority[0].values[0].value.name;
+                        var response = "I found one potential match for " + slotName + ": ";
+                        var slotData = result.values.find((slot) => { return slot[0].toUpperCase() === slotName.toUpperCase() });
+                        response += "The built-in slot Amazon Dot " + slotData[5] + " " + slotData[1];
+                        var slot = slotData[0];
+                        this.emit(":askWithCard", response + getRandomPrompt(), response + getRandomPrompt(), slot, slotData[1]);
+                        //this.emit(':askWithCard', speechOutput, repromptSpeech, cardTitle, cardContent, imageObj);
+                    }
+                    else if (listLength > 1)
+                    {
+                        var speechResponse = "There are several matching built-in slots for " + slotValue + ": Would you like to know more about ";
+                        response = "";
+                        for (var i = 0; i<listLength;i++)
+                        {
+                            var slotData = result.values.find((slot) => { return slot[0].toUpperCase() === this.event.request.intent.slots.slottype.resolutions.resolutionsPerAuthority[0].values[i].value.name.toUpperCase() });
+                            speechResponse += "Amazon Dot " + slotData[5];
+                            response += "\n" + slotData[0]
+                            if (i <= (listLength-2)) speechResponse += ", ";
+                            if (i===(listLength-2)) speechResponse += "or ";
+                        }
+                        speechResponse += "?";
+                        this.emit(":askWithCard", speechResponse, speechResponse, "SEVERAL MATCHES FOR " + slotValue, response);
+                    }
                 });
             }
             else
@@ -75,24 +96,24 @@ exports.handler = function (event, context) {
     alexa.execute();
 };
 
+/*
 function getSlotInfo(notThis, data, slotValue)
 {
-    var response = "";
-    var listLength = notThis.event.request.intent.slots.slottype.resolutions.resolutionsPerAuthority[0].values.length;
     if (listLength === 1)
     {
         var slotName = notThis.event.request.intent.slots.slottype.resolutions.resolutionsPerAuthority[0].values[0].value.name;
-        response = "I found one potential match for " + slotValue + ": ";
+        //response.speech = "I found one potential match for " + slotValue + ": ";
         var slotData = data.values.find((slot) => { return slot[0].toUpperCase() === slotName.toUpperCase() });
-        response += "The built-in slot Amazon Dot " + slotData[5] + " " + slotData[1]+ " What other slot type can I help you with?";
+        //response.speech += "The built-in slot Amazon Dot " + slotData[5] + " " + slotData[1]+ " What other slot type can I help you with?";
+        //response.slotname = slotData[0];
         //httpsSet(slotData[6], slotData[7], (response) => {
-            return response;
+            return slotData;
         //});
         
     }
     else if (listLength > 1)
     {
-        response = "There are several matching built-in slots " + slotValue + ": Would you like to know more about ";
+        response = "There are several matching built-in slots for " + slotValue + ": Would you like to know more about ";
         for (var i = 0; i<listLength;i++)
         {
             var slotData = data.values.find((slot) => { return slot[0].toUpperCase() === notThis.event.request.intent.slots.slottype.resolutions.resolutionsPerAuthority[0].values[i].value.name.toUpperCase() });
@@ -103,6 +124,12 @@ function getSlotInfo(notThis, data, slotValue)
         response += "?";
         return response;
     }
+}
+*/
+
+function getRandomPrompt()
+{
+    return " What other slot type can I help you with?";
 }
 
 function getRandom(min, max)
