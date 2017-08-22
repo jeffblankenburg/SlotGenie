@@ -62,7 +62,6 @@
               "minutes",
               "hours",
               "days",
-              "weeks",
               "months",
               "years",
               "decades",
